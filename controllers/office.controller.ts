@@ -4,12 +4,13 @@ import { Office } from "../model/Office"; // Ensure path is correct
 import Booking from "../model/booking.model"; // Ensure path is correct
 
 // 1. Get all offices
-export const getAllOffices = async (req: Request, res: Response) => {
+export const getAllOffices = async (_req: Request, res: Response) => {
   try {
-    const offices = await Office.find().sort({ name: 1 });
-    res.json(offices);
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching offices" });
+    const offices = await Office.find().sort({ createdAt: -1 });
+    return res.status(200).json(offices);
+  } catch (error: any) {
+    console.error("❌ getAllOffices error:", error.message);
+    return res.status(500).json({ message: "Failed to fetch offices" });
   }
 };
 
