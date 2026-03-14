@@ -33,14 +33,6 @@ const transporter = nodemailer.createTransport({
   socketTimeout: 30000,
 });
 
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("❌ SMTP Verify Error:", error);
-  } else {
-    console.log("✅ SMTP server is ready");
-  }
-});
-
 // ---------------------------------------------------------
 // 1. SEND OTP
 // ---------------------------------------------------------
@@ -59,7 +51,7 @@ export const sendOTP = async (req: Request, res: Response) => {
       from: `"UniVentry System" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: "Verification Protocol: Your Access Code",
-      text: `Your security verification code is: ${otp}.`,
+      text: `Your verification code is ${otp}`,
     });
 
     return res.status(200).json({
@@ -71,7 +63,7 @@ export const sendOTP = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
-      message: "OTP generated but email sending failed",
+      message: "OTP generated but email service unavailable",
       otp,
     });
   }
