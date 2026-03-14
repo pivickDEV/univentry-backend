@@ -13,10 +13,15 @@ import { sendSMS } from "../services/sms.service"; // Uncomment if you have this
 const otpStore: Record<string, string> = {};
 
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true, // Forces secure SSL/IPv4
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
+  },
+  tls: {
+    rejectUnauthorized: false, // Bypasses strict cloud firewalls
   },
 });
 
@@ -475,21 +480,5 @@ export const getVisitorDetails = async (req: Request, res: Response) => {
     res.status(200).json(booking);
   } catch (error) {
     res.status(500).json({ message: "Server Error fetching visitor details" });
-  }
-};
-
-// ---------------------------------------------------------
-// 9. GET VECTORS (Specifically for CCTV Face Matching)
-// ---------------------------------------------------------
-export const getVectors = async (req: Request, res: Response) => {
-  try {
-    // Only fetch people who actually have a face scan, and ONLY return their name and vector
-    const bookings = await Booking.find({
-      faceEmbedding: { $exists: true, $not: { $size: 0 } },
-    }).select("firstName lastName faceEmbedding");
-
-    res.status(200).json(bookings);
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching vectors" });
   }
 };
