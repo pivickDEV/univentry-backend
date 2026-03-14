@@ -20,7 +20,8 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:5173",
   "https://univentry-frontend.vercel.app",
-];
+  process.env.FRONTEND_URL,
+].filter(Boolean) as string[];
 
 app.use(
   cors({
@@ -33,9 +34,6 @@ app.use(
     credentials: true,
   }),
 );
-app.get("/api/health", (_req, res) => {
-  res.status(200).json({ ok: true });
-});
 
 app.use((req, _res, next) => {
   console.log(`➡️ ${req.method} ${req.originalUrl}`);
@@ -58,11 +56,12 @@ app.use("/api/users", userRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/offices", officeRoutes);
 app.use("/api/audit-trail", auditRoutes);
-app.post("/api/send-otp", sendOTP);
-app.post("/api/verify-otp", verifyOTP);
 app.use("/api/cctv-logs", cctvLogRoutes);
 app.use("/api/stream", streamRoutes);
 app.use("/api", faceRecognitionRoutes);
+
+app.post("/api/send-otp", sendOTP);
+app.post("/api/verify-otp", verifyOTP);
 
 startOverstayMonitor();
 

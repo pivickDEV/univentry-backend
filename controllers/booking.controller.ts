@@ -22,62 +22,19 @@ const otpStore: Record<string, string> = {};
 // ---------------------------------------------------------
 // 1. SEND OTP
 // ---------------------------------------------------------
-export const sendOTP = async (req: Request, res: Response) => {
-  const { email } = req.body;
+import { sendEmail } from "../services/email.service";
 
-  if (!email) {
-    return res.status(400).json({ error: "Email is required" });
-  }
+export const sendOTPEmail = async (email: string, otp: string) => {
+  const html = `
+  <div style="font-family: Arial; padding:20px">
+    <h2>UniVentry OTP Verification</h2>
+    <p>Your OTP code is:</p>
+    <h1 style="letter-spacing:5px">${otp}</h1>
+    <p>This code will expire in 5 minutes.</p>
+  </div>
+  `;
 
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  otpStore[email] = otp;
-
-  try {
-    const { error, data } = await resend.emails.send({
-      from: process.env.RESEND_FROM_EMAIL as string,
-      to: [email],
-      subject: "Verification Protocol: Your Access Code",
-      html: `
-        <div style="font-family: Arial, sans-serif; background:#f5f7fb; padding:40px;">
-          <div style="max-width:600px; margin:auto; background:#ffffff; padding:30px; border-radius:12px;">
-            <h2 style="margin:0 0 12px; color:#111827;">UniVentry Verification</h2>
-            <p style="color:#374151; font-size:16px;">Your security verification code is:</p>
-
-            <div style="
-              font-size:36px;
-              font-weight:700;
-              letter-spacing:8px;
-              background:#f3f4f6;
-              padding:18px;
-              border-radius:10px;
-              text-align:center;
-              margin:24px 0;
-              color:#111827;
-            ">
-              ${otp}
-            </div>
-
-            <p style="color:#6b7280; font-size:14px;">This code expires in 10 minutes.</p>
-          </div>
-        </div>
-      `,
-    });
-
-    if (error) {
-      console.error("❌ Resend OTP Error:", error);
-      return res
-        .status(500)
-        .json({ error: error.message || "Failed to send email." });
-    }
-
-    console.log("✅ OTP Email Sent:", data);
-    return res.status(200).json({ success: true, message: "OTP Sent" });
-  } catch (error: any) {
-    console.error("❌ Resend OTP Error:", error);
-    return res
-      .status(500)
-      .json({ error: error.message || "Failed to send email." });
-  }
+  await sendEmail(email, "UniVentry OTP Code", html);
 };
 
 // ---------------------------------------------------------
