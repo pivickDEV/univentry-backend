@@ -4,11 +4,14 @@ import Booking from "../model/booking.model";
 
 export const getAuditTrail = async (req: Request, res: Response) => {
   try {
-    const bookings = await Booking.find().sort({ createdAt: -1 });
+    // 🔥 THE FIX: .select() excludes the heavy images/vectors so this loads instantly
+    // .lean() converts Mongoose documents to plain JSON objects for faster processing
+    const bookings = await Booking.find()
+      .select("-idFront -idBack -faceEmbedding")
+      .sort({ createdAt: -1 })
+      .lean();
 
     const auditLogs = bookings.map((log: any) => {
-      // Type as any to access old 'date' field
-
       // Duration Logic
       let calculatedHours = 0;
       if (log.timeIn && log.timeOut) {
@@ -21,33 +24,20 @@ export const getAuditTrail = async (req: Request, res: Response) => {
       }
 
       return {
-        _id: log._id,
-        firstName: log.firstName,
-        lastName: log.lastName,
-        email: log.email,
-        phoneNumber: log.phoneNumber,
-        category: log.category,
-        office: log.office,
-        purpose: log.purpose,
+        ...log, // Keep all other fields (_id, firstName, office, etc.)
 
         // 🔥 FIX: Check bookingDate first, fallback to old 'date', fallback to today
         bookingDate:
           log.bookingDate || log.date || new Date().toISOString().split("T")[0],
 
-        status: log.status,
-        timeIn: log.timeIn,
-        transactionTime: log.transactionTime,
-        timeOut: log.timeOut,
         hours: calculatedHours,
         actionBy: log.actionBy || "SYSTEM",
 
-        idCategory: log.idCategory,
-        idType: log.idType,
-        idFront: log.idFront,
-        idBack: log.idBack,
-        ocrFront: log.ocrFront,
-        ocrBack: log.ocrBack,
-        faceEmbedding: log.faceEmbedding,
+        // These fields are explicitly removed by .select() above to save memory,
+        // but we ensure they are cleanly undefined in the payload
+        idFront: undefined,
+        idBack: undefined,
+        faceEmbedding: undefined,
       };
     });
 
