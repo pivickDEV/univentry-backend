@@ -18,13 +18,24 @@ import { initSurveillanceGrid } from "../services/rstp.service";
 
 const app = express();
 
-// 1. MIDDLEWARE
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: [
+      "http://localhost:5173", // Local frontend testing
+      "https://univentry-frontend.vercel.app", // Production frontend
+    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "ngrok-skip-browser-warning",
+    ],
     credentials: true,
   }),
 );
+
+// Keep this to handle preflight requests smoothly
+app.options(/(.*)/, cors());
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -47,17 +58,20 @@ app.get("/", (_req, res) => {
   res.send("UniVentry Backend Running");
 });
 
+// 🔥 START THE MONITOR
+startOverstayMonitor();
+
 // 3. DATABASE & SERVER START
 const startServer = async () => {
   try {
     await connectDB();
 
-    startOverstayMonitor();
-
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`🚀 Server running on ${PORT}`);
-      console.log(`📁 Office Registry: ${PORT}/api/offices`);
-      console.log(`📊 Slot System: ${PORT}/api/bookings/slots`);
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on http://localhost:${PORT}`);
+      console.log(`📁 Office Registry: http://localhost:${PORT}/api/offices`);
+      console.log(
+        `📊 Slot System: http://localhost:${PORT}/api/bookings/slots`,
+      );
       initSurveillanceGrid();
     });
   } catch (err) {
