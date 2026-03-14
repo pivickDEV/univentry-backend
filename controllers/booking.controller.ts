@@ -477,3 +477,19 @@ export const getVisitorDetails = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Server Error fetching visitor details" });
   }
 };
+
+// ---------------------------------------------------------
+// 9. GET VECTORS (Specifically for CCTV Face Matching)
+// ---------------------------------------------------------
+export const getVectors = async (req: Request, res: Response) => {
+  try {
+    // Only fetch people who actually have a face scan, and ONLY return their name and vector
+    const bookings = await Booking.find({
+      faceEmbedding: { $exists: true, $not: { $size: 0 } },
+    }).select("firstName lastName faceEmbedding");
+
+    res.status(200).json(bookings);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching vectors" });
+  }
+};

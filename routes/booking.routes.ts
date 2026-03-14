@@ -7,6 +7,8 @@ import {
   getVisitorDetails,
   scanQR,
   scanTransaction,
+  sendOTP,
+  verifyOTP,
 } from "../controllers/booking.controller";
 import { protect } from "../middlewares/auth.middleware";
 
@@ -16,6 +18,10 @@ const router = express.Router();
 router.get("/slots", getSlots);
 router.post("/", createBooking);
 router.get("/", getAllBookings);
+
+// 🚀 2. ADD THESE TWO EXACT LINES AT THE TOP OF YOUR ROUTES:
+router.post("/send-otp", sendOTP);
+router.post("/verify-otp", verifyOTP);
 
 // 🔥 2. ADD THIS ROUTE (Required for Transaction Scan Preview)
 router.get("/:id", getVisitorDetails);
