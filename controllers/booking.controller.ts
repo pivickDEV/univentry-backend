@@ -33,13 +33,13 @@ const buildBookingEmailHtml = ({
   firstName,
   office,
   bookingDate,
-  qrCodeImageUrl,
+  qrCodeDataURL,
   bookingId,
 }: {
   firstName: string;
   office: string;
   bookingDate: string;
-  qrCodeImageUrl: string;
+  qrCodeDataURL: string;
   bookingId: string;
 }) => `
   <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden; background-color: #ffffff;">
@@ -62,34 +62,10 @@ const buildBookingEmailHtml = ({
 
       <div style="margin: 30px 0; padding: 20px; border: 2px dashed #e2e8f0; border-radius: 20px; background-color: #f8fafc; display: inline-block;">
         <img
-          src="${qrCodeImageUrl}"
+          src="${qrCodeDataURL}"
           alt="QR Code"
-          width="200"
-          height="200"
-          style="width: 200px; height: 200px; display: block; border-radius: 10px; margin: 0 auto;"
+          style="width: 200px; height: 200px; display: block; border-radius: 10px;"
         />
-
-        <div style="margin-top: 16px;">
-          <a
-            href="${qrCodeImageUrl}"
-            target="_blank"
-            style="display: inline-block; background: #0038A8; color: #ffffff; text-decoration: none; padding: 10px 18px; border-radius: 12px; font-size: 14px; font-weight: 700;"
-          >
-            Download QR Code
-          </a>
-        </div>
-
-        <p style="margin-top: 12px; font-size: 12px; color: #64748b; line-height: 1.5; word-break: break-all; max-width: 260px;">
-          If the QR image does not appear, open or copy this link:<br />
-          <a
-            href="${qrCodeImageUrl}"
-            target="_blank"
-            style="color: #0038A8; text-decoration: underline;"
-          >
-            ${qrCodeImageUrl}
-          </a>
-        </p>
-
         <p style="margin-top: 15px; font-family: monospace; font-weight: bold; color: #0038A8; font-size: 14px; letter-spacing: 1px;">
           ID: #${bookingId.slice(-6).toUpperCase()}
         </p>
@@ -375,7 +351,7 @@ export const createBooking = async (req: Request, res: Response) => {
           firstName: saved.firstName,
           office: saved.office,
           bookingDate: saved.bookingDate,
-          qrCodeImageUrl: qrCodeDataURL,
+          qrCodeDataURL,
           bookingId: saved._id.toString(),
         }),
         textContent: `Hello ${saved.firstName}, your appointment for ${saved.office} on ${saved.bookingDate} is confirmed. Present your QR pass at the campus gate.`,
