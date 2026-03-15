@@ -91,6 +91,14 @@ const buildBookingEmailHtml = ({
         © ${new Date().getFullYear()} Rizal Technological University Security.
       </p>
     </div>
+     <div style="padding: 20px; text-align:center;">
+      <p style="font-size:13px; color:#64748b;">
+        Your QR pass is also attached below this email as a PNG file.
+      </p>
+
+      <p style="font-size:12px; color:#94a3b8;">
+        File name: <strong>univentry-qr-${bookingId.slice(-6).toUpperCase()}.png</strong>
+      </p>
   </div>
 `;
 
