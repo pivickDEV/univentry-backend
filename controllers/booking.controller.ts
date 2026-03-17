@@ -96,7 +96,7 @@ export const buildBookingEmailHtml = ({
 
       
       <tr>
-        <td style="background-color: #c6c7c9; padding: 25px 30px;">
+        <td style="background-color: #ebedef; padding: 25px 30px;">
           <table border="0" cellpadding="0" cellspacing="0" width="100%">
             <tr>
               <td align="left">
