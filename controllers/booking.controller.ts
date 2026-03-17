@@ -29,73 +29,96 @@ const buildOTPEmailHtml = (otp: string) => `
   </div>
 `;
 
-const buildBookingEmailHtml = ({
+export const buildBookingEmailHtml = ({
   firstName,
+  lastName = "",
+  category = "Visitor",
   office,
   bookingDate,
-  qrCodeDataURL,
+  qrCodeDataURL, // Keep this here to not break TypeScript
   bookingId,
 }: {
   firstName: string;
+  lastName?: string;
+  category?: string;
   office: string;
   bookingDate: string;
   qrCodeDataURL: string;
   bookingId: string;
 }) => `
-  <div style="padding: 40px; text-align: center; color: #1e293b;">
-  <h2 style="color: #0038A8; font-size: 22px; margin-bottom: 10px; font-weight: 800;">
-    Hello, ${firstName}!
-  </h2>
+  <div style="background-color: #F8FAFC; padding: 40px 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 420px; background-color: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,56,168,0.1);">
 
-  <p style="font-size: 15px; color: #475569;">
-    Your appointment for <strong>${office}</strong> is
-    <span style="color: #10b981; font-weight: bold;"> Confirmed</span>.
-  </p>
+      <tr>
+        <td align="center" style="background-color: #001233; padding: 40px 20px; border-top: 6px solid #FFD700;">
+          <div style="width: 50px; height: 50px; background-color: #0038A8; border-radius: 50%; display: inline-block; margin-bottom: 15px; border: 1px solid rgba(255,215,0,0.3);">
+            <span style="color: #FFD700; font-size: 26px; line-height: 50px; font-weight: bold;">✓</span>
+          </div>
+          <h2 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase;">Clearance Granted</h2>
+          <p style="color: #93c5fd; margin: 8px 0 0 0; font-size: 10px; font-weight: 900; letter-spacing: 3px; text-transform: uppercase;">Encrypted Digital Pass</p>
+        </td>
+      </tr>
 
-  <div style="margin: 30px 0; padding: 20px; border: 2px dashed #e2e8f0; border-radius: 20px; background-color: #f8fafc; display: inline-block;">
-    
-    {/* 🚀 FIX 1: Use the public API for the image source instead of Base64 */}
-    <img
-      src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${bookingId}"
-      alt="QR Code"
-      style="width: 200px; height: 200px; display: block; border-radius: 10px;"
-    />
+      
+      <tr>
+        <td align="center" style="padding: 40px 20px 30px 20px;">
+          <h3 style="color: #0038A8; margin: 0 0 8px 0; font-size: 24px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.5px;">
+            ${firstName} ${lastName}
+          </h3>
 
-    <p style="margin-top: 15px; font-family: monospace; font-weight: bold; color: #0038A8; font-size: 14px; letter-spacing: 1px;">
-      ID: #${bookingId.slice(-6).toUpperCase()}
+        
+          <div style="background-color: #f1f5f9; padding: 6px 16px; border-radius: 20px; display: inline-block; margin-bottom: 30px; border: 1px solid #e2e8f0;">
+            <span style="color: #64748b; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px;">
+              ${category} <span style="color: #FFD700; margin: 0 5px;">•</span> ${office}
+            </span>
+          </div>
+
+        
+          <div style="border: 4px solid #0038A8; padding: 12px; border-radius: 16px; display: inline-block; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,56,168,0.15);">
+            <img src="cid:qrcode" alt="QR Code" width="160" height="160" style="display: block; border-radius: 8px;" />
+          </div>
+
+          <p style="color: #0038A8; margin: 0; font-size: 20px; font-family: monospace; font-weight: 900; letter-spacing: 4px;">
+            #${bookingId.slice(-6).toUpperCase()}
+          </p>
+
+         
+          <a href="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${bookingId}" target="_blank" style="display: inline-block; margin-top: 25px; padding: 12px 24px; background-color: #0038A8; color: #FFD700; text-decoration: none; border-radius: 12px; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px;">
+            Download HD Pass
+          </a>
+        </td>
+      </tr>
+
+     
+      <tr>
+        <td style="padding: 0 30px;">
+          <div style="border-top: 2px dashed #e2e8f0; width: 100%;"></div>
+        </td>
+      </tr>
+
+      
+      <tr>
+        <td style="background-color: #f8fafc; padding: 25px 30px;">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+              <td align="left">
+                <span style="display: block; color: #94a3b8; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px;">Authorized Date</span>
+                <span style="color: #0038A8; font-size: 14px; font-weight: 900;">${bookingDate}</span>
+              </td>
+              <td align="right">
+                <span style="display: block; color: #94a3b8; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px;">Pass Status</span>
+                <span style="background-color: #d1fae5; color: #059669; border: 1px solid #a7f3d0; padding: 5px 10px; border-radius: 6px; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px;">Verified</span>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <p style="text-align: center; color: #94a3b8; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; margin-top: 30px;">
+      Scan QR at the Main Gate Terminal
     </p>
-
-    {/* 🚀 FIX 2: Point the download button to a high-res version of the public link */}
-    <a
-      href="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${bookingId}"
-      target="_blank"
-      rel="noopener noreferrer"
-      style="display: inline-block; margin-top: 15px; padding: 10px 18px; background: #0038A8; color: #ffffff; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 700;"
-    >
-      View Full Size QR
-    </a>
   </div>
-
-  <p style="font-size: 14px; color: #64748b; margin-bottom: 30px;">
-    Present this QR code at the <strong>Campus Gate</strong> scanner.
-  </p>
-
-  <div style="margin-top: 30px; padding: 15px; background: #eff6ff; border-radius: 12px; border: 1px solid #dbeafe;">
-    <span style="font-size: 10px; font-weight: bold; color: #0038A8; text-transform: uppercase; letter-spacing: 1px;">
-      Valid Date
-    </span>
-    <br />
-    <span style="font-size: 16px; font-weight: 800; color: #1e293b;">
-      ${bookingDate}
-    </span>
-  </div>
-</div>
-
-<div style="background: #f1f5f9; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
-  <p style="font-size: 11px; color: #64748b; margin: 0;">
-    © ${new Date().getFullYear()} Rizal Technological University Security.
-  </p>
-</div>
 `;
 
 // 1. SEND OTP
