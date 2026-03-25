@@ -1,35 +1,251 @@
-// ... existing imports ...
-import bcrypt from "bcrypt"; // or "bcrypt" depending on what you installed
+/* eslint-disable */
+import bcrypt from "bcrypt";
 import { Request, Response } from "express";
-import User from "../model/user"; // Ensure your User model is imported
-import { sendEmail } from "../services/email.service"; // Adjust path to your Brevo service
+import User from "../model/user"; // Ensure your User model path is correct
+import { sendEmail } from "../services/email.service"; // Ensure your Brevo service path is correct
 
-export const updateEmail = async (req: Request, res: Response) => {
+// --- TEMPORARY MEMORY STORE FOR CAPSTONE ---
+const resetOtpStore: Record<string, { otp: string; expires: number }> = {};
+const verifiedResetSessions = new Set<string>();
+
+// =========================================================
+// 1. CREATE USER (SIGNUP) - WITH BREVO EMAIL & SECURITY
+// =========================================================
+export const createUser = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { name, email, password, role } = req.body;
+
+    // Who is making this request? (Assuming `protect` middleware sets req.user)
+    const creatorRole = (req as any).user?.role;
+
+    // 🔒 SECURITY CHECK: Only a Super Admin can create another Super Admin
+    if (role === "super-admin" && creatorRole !== "super-admin") {
+      return res.status(403).json({
+        message:
+          "Access Denied: Only Super Admins can create Super Admin accounts.",
+      });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "Email already in use." });
+    }
+
+    // Hash password & Save
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const newUser = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role,
+    });
+
+    // ✉️ SEND BEAUTIFUL BREVO EMAIL (Non-Blocking / Fire-and-Forget)
+    const emailHtml = `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden;">
+        <div style="background: #0038A8; padding: 30px; text-align: center;">
+          <h1 style="color: #FFD700; margin: 0; letter-spacing: 2px; font-size: 28px; font-weight: 900;">UNIVENTRY</h1>
+          <p style="color: #ffffff; margin: 5px 0 0 0; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8;">System Access Granted</p>
+        </div>
+        <div style="padding: 40px; text-align: left; color: #1e293b;">
+          <h2 style="color: #0038A8; font-size: 22px; margin-bottom: 10px; font-weight: 800;">Hello, ${name}!</h2>
+          <p style="font-size: 15px; color: #475569;">An administrator has successfully provisioned your account for the UniVentry System.</p>
+          
+          <div style="margin: 30px 0; padding: 20px; border: 1px solid #e2e8f0; border-radius: 15px; background-color: #f8fafc;">
+            <p style="margin: 0 0 10px 0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;">Your Credentials</p>
+            <p style="margin: 5px 0;"><strong>Role Clearance:</strong> <span style="color: #0038A8; background: #eff6ff; padding: 2px 8px; border-radius: 4px;">${role.toUpperCase()}</span></p>
+            <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
+            <p style="margin: 5px 0;"><strong>Temporary Password:</strong> <span style="font-family: monospace; background: #e2e8f0; padding: 2px 6px;">${password}</span></p>
+          </div>
+          
+          <p style="font-size: 14px; color: #dc2626; font-weight: bold;">⚠️ Security Notice: Please log in immediately and change your password.</p>
+        </div>
+      </div>
+    `;
+
+    // Fire and forget email
+    sendEmail({
+      to: email,
+      subject: "🔑 Your UniVentry System Credentials",
+      htmlContent: emailHtml,
+    }).catch((err: any) => console.error("⚠️ Brevo Email Warning:", err));
+
+    return res.status(201).json({
+      success: true,
+      message: "Personnel registered successfully.",
+      user: newUser,
+    });
+  } catch (error: any) {
+    console.error("Create User Error:", error);
+    return res
+      .status(500)
+      .json({ message: "Server error during registration." });
+  }
+};
+
+// =========================================================
+// 2. DELETE USER - WITH SUPER ADMIN SECURITY LOCK
+// =========================================================
+export const deleteUser = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const targetUser = await User.findById(req.params.id);
+    const requesterRole = (req as any).user?.role;
+
+    if (!targetUser) return res.status(404).json({ message: "User not found" });
+
+    // 🔒 SECURITY CHECK: Admins cannot delete Super Admins
+    if (targetUser.role === "super-admin" && requesterRole !== "super-admin") {
+      return res.status(403).json({
+        message: "Clearance Denied: Cannot purge a Super Admin account.",
+      });
+    }
+
+    await User.findByIdAndDelete(req.params.id);
+    return res.status(200).json({ message: "User deleted successfully." });
+  } catch (error) {
+    console.error("Delete User Error:", error);
+    return res.status(500).json({ message: "Failed to delete user." });
+  }
+};
+
+// =========================================================
+// 3. UPDATE USER PROFILE & EMAIL (SECURITY LOCKED)
+// =========================================================
+export const updateProfile = async (
+  req: Request,
+  res: Response,
+): Promise<any> => {
+  try {
+    const { userId, name, email } = req.body;
+    const requesterRole = (req as any).user?.role;
+    const targetUser = await User.findById(userId);
+
+    if (!targetUser)
+      return res.status(404).json({ message: "User not found." });
+
+    // 🔒 SECURITY CHECK: Only Super Admins can edit Super Admin emails/profiles
+    if (targetUser.role === "super-admin" && requesterRole !== "super-admin") {
+      return res.status(403).json({
+        message: "Clearance Denied: Cannot modify a Super Admin profile.",
+      });
+    }
+
+    // Check if another user already has this email
+    const emailExists = await User.findOne({ email, _id: { $ne: userId } });
+    if (emailExists) {
+      return res
+        .status(400)
+        .json({ message: "This email is already in use by another account." });
+    }
+
+    const nameParts = name.split(" ");
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(" ");
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { name, firstName, lastName, email },
+      { new: true },
+    ).select("-password");
+
+    return res
+      .status(200)
+      .json({ message: "Profile updated successfully.", user: updatedUser });
+  } catch (error) {
+    console.error("Update Profile Error:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+// =========================================================
+// 4. UPDATE EMAIL ONLY (RESTORED & SECURED)
+// =========================================================
+export const updateEmail = async (
+  req: Request,
+  res: Response,
+): Promise<any> => {
   try {
     const { id } = req.params;
     const { email } = req.body;
+    const requesterRole = (req as any).user?.role;
 
-    const user = await User.findByIdAndUpdate(
-      id,
-      { email: email },
-      { new: true }, // Returns the updated document
-    );
+    const targetUser = await User.findById(id);
 
-    if (!user) {
+    if (!targetUser) {
       return res.status(404).json({ message: "User not found." });
     }
 
-    res.status(200).json({ message: "Email updated successfully.", user });
+    // 🔒 SECURITY CHECK: Admins cannot change a Super Admin's email
+    if (targetUser.role === "super-admin" && requesterRole !== "super-admin") {
+      return res.status(403).json({
+        message: "Clearance Denied: Cannot modify a Super Admin account.",
+      });
+    }
+
+    targetUser.email = email;
+    await targetUser.save(); // Using save to trigger mongoose validations (like unique constraints)
+
+    return res
+      .status(200)
+      .json({ message: "Email updated successfully.", user: targetUser });
   } catch (error: any) {
     if (error.code === 11000) {
       return res.status(400).json({ message: "Email is already in use." });
     }
-    res.status(500).json({ message: "Server error updating email." });
+    return res.status(500).json({ message: "Server error updating email." });
   }
 };
 
-// 🔥 2. UPDATE OFFICE
-export const updateOffice = async (req: Request, res: Response) => {
+// =========================================================
+// 5. UPDATE USER ROLE (SECURITY LOCKED)
+// =========================================================
+export const updateUserRole = async (
+  req: Request,
+  res: Response,
+): Promise<any> => {
+  try {
+    const targetUser = await User.findById(req.params.id);
+    const { role: newRole } = req.body;
+    const requesterRole = (req as any).user?.role;
+
+    if (!targetUser) return res.status(404).json({ message: "User not found" });
+
+    // 🔒 SECURITY CHECK: Admins cannot edit an existing Super Admin
+    if (targetUser.role === "super-admin" && requesterRole !== "super-admin") {
+      return res.status(403).json({
+        message: "Clearance Denied: Cannot modify a Super Admin account.",
+      });
+    }
+
+    // 🔒 SECURITY CHECK: Admins cannot promote someone TO Super Admin
+    if (newRole === "super-admin" && requesterRole !== "super-admin") {
+      return res.status(403).json({
+        message:
+          "Clearance Denied: Only Super Admins can grant developer privileges.",
+      });
+    }
+
+    targetUser.role = newRole;
+    await targetUser.save();
+
+    return res
+      .status(200)
+      .json({ message: "Clearance level updated.", user: targetUser });
+  } catch (error) {
+    console.error("Update Role Error:", error);
+    return res.status(500).json({ message: "Failed to update role." });
+  }
+};
+
+// =========================================================
+// 6. UPDATE OFFICE (FOR OFFICE STAFF)
+// =========================================================
+export const updateOffice = async (
+  req: Request,
+  res: Response,
+): Promise<any> => {
   try {
     const { id } = req.params;
     const { office } = req.body;
@@ -39,26 +255,50 @@ export const updateOffice = async (req: Request, res: Response) => {
       { office: office },
       { new: true },
     );
+    if (!user) return res.status(404).json({ message: "User not found." });
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found." });
-    }
-
-    res.status(200).json({ message: "Office updated successfully.", user });
+    return res
+      .status(200)
+      .json({ message: "Office updated successfully.", user });
   } catch (error) {
-    res.status(500).json({ message: "Server error updating office." });
+    return res.status(500).json({ message: "Server error updating office." });
   }
 };
 
-// --- TEMPORARY MEMORY STORE FOR CAPSTONE ---
-// In a massive production app, this goes into Redis or MongoDB.
-// For your defense, in-memory is blazing fast and works perfectly.
-const resetOtpStore: Record<string, { otp: string; expires: number }> = {};
-const verifiedResetSessions = new Set<string>();
+// =========================================================
+// 7. CHANGE PASSWORD (DOUBLE-HASH FIX)
+// =========================================================
+export const changePassword = async (
+  req: Request,
+  res: Response,
+): Promise<any> => {
+  try {
+    const { userId, currentPassword, newPassword } = req.body;
 
-// ---------------------------------------------------------
-// 1. FORGOT PASSWORD (SEND OTP VIA BREVO)
-// ---------------------------------------------------------
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch)
+      return res.status(400).json({ message: "Invalid current passcode." });
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await User.findByIdAndUpdate(userId, { password: hashedPassword });
+
+    return res
+      .status(200)
+      .json({ message: "Security key overridden successfully." });
+  } catch (error) {
+    console.error("Change Password Error:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+// =========================================================
+// 8. FORGOT PASSWORD (SEND OTP VIA BREVO)
+// =========================================================
 export const forgotPassword = async (
   req: Request,
   res: Response,
@@ -67,22 +307,15 @@ export const forgotPassword = async (
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: "Email is required." });
 
-    // 1. Check if user actually exists in the database
     const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) {
+    if (!user)
       return res
         .status(404)
         .json({ message: "No authorized account found with this email." });
-    }
 
-    // 2. Generate 6-Digit Code (Valid for 15 mins)
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    resetOtpStore[user.email] = {
-      otp,
-      expires: Date.now() + 15 * 60 * 1000,
-    };
+    resetOtpStore[user.email] = { otp, expires: Date.now() + 15 * 60 * 1000 };
 
-    // 3. Send Beautiful RTU Email via Brevo
     const htmlContent = `
       <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden; background-color: #ffffff;">
         <div style="background: #001233; padding: 30px; text-align: center; border-bottom: 4px solid #FFD700;">
@@ -100,14 +333,6 @@ export const forgotPassword = async (
           </div>
           <p style="font-size: 12px; color: #ef4444; font-weight: bold; text-transform: uppercase; tracking-widest;">
             ⚠️ This code expires in 15 minutes.
-          </p>
-          <p style="font-size: 12px; color: #64748b; margin-top: 20px;">
-            If you did not initiate this request, please ignore this email. Your account remains secure.
-          </p>
-        </div>
-        <div style="background: #f1f5f9; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
-          <p style="font-size: 10px; color: #64748b; margin: 0; text-transform: uppercase; letter-spacing: 1px;">
-            &copy; ${new Date().getFullYear()} Rizal Technological University.
           </p>
         </div>
       </div>
@@ -128,9 +353,9 @@ export const forgotPassword = async (
   }
 };
 
-// ---------------------------------------------------------
-// 2. VERIFY OTP
-// ---------------------------------------------------------
+// =========================================================
+// 9. VERIFY OTP
+// =========================================================
 export const verifyResetOTP = async (
   req: Request,
   res: Response,
@@ -138,27 +363,19 @@ export const verifyResetOTP = async (
   try {
     const { email, otp } = req.body;
     const userEmail = email.toLowerCase();
-
     const record = resetOtpStore[userEmail];
 
-    if (!record) {
+    if (!record)
       return res
         .status(400)
         .json({ message: "No active recovery session found." });
-    }
-
     if (Date.now() > record.expires) {
       delete resetOtpStore[userEmail];
-      return res
-        .status(400)
-        .json({ message: "Recovery code has expired. Request a new one." });
+      return res.status(400).json({ message: "Recovery code has expired." });
     }
-
-    if (record.otp !== otp) {
+    if (record.otp !== otp)
       return res.status(400).json({ message: "Invalid authorization code." });
-    }
 
-    // OTP is correct! Delete it from store and mark session as verified
     delete resetOtpStore[userEmail];
     verifiedResetSessions.add(userEmail);
 
@@ -169,9 +386,9 @@ export const verifyResetOTP = async (
   }
 };
 
-// ---------------------------------------------------------
-// 3. RESET PASSWORD (ENCRYPT NEW KEY)
-// ---------------------------------------------------------
+// =========================================================
+// 10. RESET PASSWORD
+// =========================================================
 export const resetPassword = async (
   req: Request,
   res: Response,
@@ -180,24 +397,19 @@ export const resetPassword = async (
     const { email, newPassword } = req.body;
     const userEmail = email.toLowerCase();
 
-    // 1. Security Check: Did they actually verify the OTP?
     if (!verifiedResetSessions.has(userEmail)) {
       return res
         .status(403)
-        .json({ message: "Unauthorized. You must verify the OTP first." });
+        .json({ message: "Unauthorized. Verify OTP first." });
     }
 
-    // 2. Hash the new password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    // 3. Update the database
     await User.findOneAndUpdate(
       { email: userEmail },
       { password: hashedPassword },
     );
-
-    // 4. Clear the verified session
     verifiedResetSessions.delete(userEmail);
 
     return res
@@ -209,77 +421,17 @@ export const resetPassword = async (
   }
 };
 
-export const updateProfile = async (
+// =========================================================
+// 11. GET ALL USERS
+// =========================================================
+export const getAllUsers = async (
   req: Request,
   res: Response,
 ): Promise<any> => {
   try {
-    const { userId, name, email } = req.body;
-
-    // 1. Check if another user already has this email
-    const emailExists = await User.findOne({ email, _id: { $ne: userId } });
-    if (emailExists) {
-      return res
-        .status(400)
-        .json({ message: "This email is already in use by another account." });
-    }
-
-    // 2. Update the user
-    // (If your DB uses firstName/lastName instead of 'name', split it here)
-    const nameParts = name.split(" ");
-    const firstName = nameParts[0];
-    const lastName = nameParts.slice(1).join(" ");
-
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { name, firstName, lastName, email },
-      { new: true },
-    ).select("-password"); // Don't send the password back!
-
-    if (!updatedUser)
-      return res.status(404).json({ message: "User not found." });
-
-    return res
-      .status(200)
-      .json({ message: "Profile updated successfully.", user: updatedUser });
+    const users = await User.find().select("-password");
+    res.status(200).json(users);
   } catch (error) {
-    console.error("Update Profile Error:", error);
-    return res.status(500).json({ message: "Internal server error." });
-  }
-};
-
-// ---------------------------------------------------------
-// CHANGE PASSWORD (DOUBLE-HASH FIX)
-// ---------------------------------------------------------
-export const changePassword = async (
-  req: Request,
-  res: Response,
-): Promise<any> => {
-  try {
-    const { userId, currentPassword, newPassword } = req.body;
-
-    // 1. Find user to check their current password
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "User not found." });
-
-    // 2. Verify the current password matches
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid current passcode." });
-    }
-
-    // 3. Encrypt the new password ONCE
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-    // 4. 🔥 THE FIX: Use findByIdAndUpdate to bypass the pre('save') double-hashing bug!
-    await User.findByIdAndUpdate(userId, { password: hashedPassword });
-
-    return res
-      .status(200)
-      .json({ message: "Security key overridden successfully." });
-  } catch (error) {
-    console.error("Change Password Error:", error);
-    return res.status(500).json({ message: "Internal server error." });
+    res.status(500).json({ message: "Server error" });
   }
 };
