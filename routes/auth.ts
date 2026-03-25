@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import express from "express";
 import jwt from "jsonwebtoken";
+import {
+  forgotPassword,
+  resetPassword,
+  verifyResetOTP,
+} from "../controllers/user.controller";
 import User from "../model/user";
 
 const router = express.Router();
@@ -110,5 +115,8 @@ const handleSignup = async (req: express.Request, res: express.Response) => {
 };
 
 router.post("/signup", handleSignup);
+router.post("/forgot-password", forgotPassword);
+router.post("/verify-reset-otp", verifyResetOTP);
+router.post("/reset-password", resetPassword);
 
 export default router;
