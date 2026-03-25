@@ -35,9 +35,6 @@ router.get("/", async (req: Request, res: Response) => {
 router.patch("/:id/email", updateEmail);
 router.patch("/:id/office", updateOffice);
 
-router.put("/update-profile", updateProfile);
-router.put("/change-password", changePassword);
-
 // ==========================================================
 // 3. UPDATE ROLE
 // ==========================================================
@@ -128,5 +125,8 @@ router.put("/update-profile", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+router.put("/update-profile", updateProfile);
+router.put("/change-password", changePassword);
 
 export default router;

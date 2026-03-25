@@ -249,7 +249,7 @@ export const updateProfile = async (
 };
 
 // ---------------------------------------------------------
-// CHANGE PASSWORD
+// CHANGE PASSWORD (DOUBLE-HASH FIX)
 // ---------------------------------------------------------
 export const changePassword = async (
   req: Request,
@@ -258,7 +258,7 @@ export const changePassword = async (
   try {
     const { userId, currentPassword, newPassword } = req.body;
 
-    // 1. Find user and get their current encrypted password
+    // 1. Find user to check their current password
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found." });
 
@@ -268,13 +268,12 @@ export const changePassword = async (
       return res.status(400).json({ message: "Invalid current passcode." });
     }
 
-    // 3. Encrypt the new password
+    // 3. Encrypt the new password ONCE
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    // 4. Save to DB
-    user.password = hashedPassword;
-    await user.save();
+    // 4. 🔥 THE FIX: Use findByIdAndUpdate to bypass the pre('save') double-hashing bug!
+    await User.findByIdAndUpdate(userId, { password: hashedPassword });
 
     return res
       .status(200)
