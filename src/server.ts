@@ -8,6 +8,7 @@ import { connectDB } from "../lib/db";
 import auditRoutes from "../routes/audit.routes";
 import authRoutes from "../routes/auth";
 import bookingRoutes from "../routes/booking.routes";
+import categoryRoutes from "../routes/category.routes";
 import cctvLogRoutes from "../routes/cctvlog.routes";
 import faceRecognitionRoutes from "../routes/faceRecognition.routes";
 import officeRoutes from "../routes/office.routes";
@@ -59,6 +60,7 @@ app.use("/api/audit-trail", auditRoutes);
 app.use("/api/cctv-logs", cctvLogRoutes);
 app.use("/api/stream", streamRoutes);
 app.use("/api", faceRecognitionRoutes);
+app.use("/api/categories", categoryRoutes);
 
 app.post("/api/send-otp", sendOTP);
 app.post("/api/verify-otp", verifyOTP);
