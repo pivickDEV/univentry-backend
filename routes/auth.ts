@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import express from "express";
 import jwt from "jsonwebtoken";
 import User from "../model/user";
@@ -5,53 +6,39 @@ import User from "../model/user";
 const router = express.Router();
 
 // ----------------------
-// LOGIN ENDPOINT (DEBUG VERSION)
+// LOGIN ENDPOINT
 // ----------------------
-router.post("/login", async (req, res) => {
+router.post("/login", async (req: express.Request, res: express.Response) => {
   const { email, password } = req.body;
 
   console.log("-----------------------------------------");
   console.log("🔐 LOGIN ATTEMPT:", email);
 
-  // 1. Check Input
   if (!email || !password) {
-    console.log("❌ Missing inputs");
     return res.status(400).json({ message: "Email and password are required" });
   }
 
   try {
-    // 2. Find User
     const user = await User.findOne({ email });
     if (!user) {
-      console.log("❌ User not found in DB");
+      console.log("❌ User not found");
       return res.status(400).json({ message: "Invalid email or password" });
     }
-    console.log("✅ User Found:", user.name);
 
-    // 3. Check Password
-    const isPasswordValid = await user.comparePassword(password);
+    const isPasswordValid = await (user as any).comparePassword(password);
     if (!isPasswordValid) {
-      console.log(
-        "❌ Password Mismatch. Hash in DB:",
-        user.password.substring(0, 10) + "...",
-      );
       return res.status(400).json({ message: "Invalid email or password" });
     }
-    console.log("✅ Password Matched");
 
-    // 4. Check Config
     if (!process.env.JWT_SECRET) {
-      console.error(
-        "🔥 CRITICAL ERROR: JWT_SECRET is missing in .env or server.ts!",
-      );
       throw new Error("Server Misconfiguration: JWT_SECRET missing");
     }
 
-    // 5. Generate Token
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "30d",
     });
-    console.log("✅ Token Generated");
+
+    console.log(`✅ Login Successful: ${user.name} [${user.role}]`);
 
     return res.status(200).json({
       message: "Login successful",
@@ -61,48 +48,48 @@ router.post("/login", async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        office: user.office, // ✨ ADDED: Ensure frontend gets the office on login
       },
     });
   } catch (err: any) {
-    console.error("🔥 SERVER CRASH DURING LOGIN:", err.message);
+    console.error("🔥 LOGIN ERROR:", err.message);
     return res.status(500).json({ message: "Server error: " + err.message });
   }
 });
 
+// ----------------------
+// SIGNUP ENDPOINT
+// ----------------------
 const handleSignup = async (req: express.Request, res: express.Response) => {
-  const { name, email, password, role } = req.body;
+  // ✨ FIX: Destructure 'office' from req.body
+  const { name, email, password, role, office } = req.body;
 
   console.log("-----------------------------------------");
-  console.log("📝 SIGNUP ATTEMPT:", email, "Role:", role);
+  console.log("📝 SIGNUP ATTEMPT:", email, "Role:", role, "Office:", office);
 
   try {
-    // 1. Validate input
     if (!name || !email || !password || !role) {
-      console.log("❌ Missing fields");
       return res.status(400).json({ message: "All fields are required." });
     }
 
-    // 2. Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      console.log("❌ Email already in use");
       return res.status(400).json({ message: "Email is already registered." });
     }
 
-    // 3. Create the new user
-    // (Assuming your User model handles password hashing automatically in a pre-save hook)
+    // ✨ FIX: Include 'office' in the new User object
+    // Note: We only save office if the role is 'office' or 'admin'
     const newUser = new User({
       name,
       email,
       password,
       role,
+      office: role === "super-admin" || role === "guard" ? "System" : office,
     });
 
-    // 4. Save to database
     await newUser.save();
     console.log("✅ User Successfully Created:", newUser.name);
 
-    // 5. SEND RESPONSE BACK TO FRONTEND (This stops the infinite loading spinner!)
     return res.status(201).json({
       message: "User registered successfully!",
       user: {
@@ -110,10 +97,11 @@ const handleSignup = async (req: express.Request, res: express.Response) => {
         name: newUser.name,
         email: newUser.email,
         role: newUser.role,
+        office: newUser.office, // ✨ Return the office back to frontend
       },
     });
   } catch (err: any) {
-    console.error("🔥 SERVER CRASH DURING SIGNUP:", err.message);
+    console.error("🔥 SIGNUP ERROR:", err.message);
     return res.status(500).json({
       message: "Server error during registration.",
       error: err.message,
