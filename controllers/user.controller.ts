@@ -11,14 +11,13 @@ const verifiedResetSessions = new Set<string>();
 // =========================================================
 // 1. CREATE USER (SIGNUP) - WITH BREVO EMAIL & SECURITY
 // =========================================================
+
 export const createUser = async (req: Request, res: Response): Promise<any> => {
   try {
     const { name, email, password, role } = req.body;
 
-    // Who is making this request? (Assuming `protect` middleware sets req.user)
     const creatorRole = (req as any).user?.role;
 
-    // 🔒 SECURITY CHECK: Only a Super Admin can create another Super Admin
     if (role === "super-admin" && creatorRole !== "super-admin") {
       return res.status(403).json({
         message:
@@ -31,7 +30,6 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
       return res.status(400).json({ message: "Email already in use." });
     }
 
-    // Hash password & Save
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -42,7 +40,6 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
       role,
     });
 
-    // ✉️ SEND BEAUTIFUL BREVO EMAIL (Non-Blocking / Fire-and-Forget)
     const emailHtml = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden;">
         <div style="background: #0038A8; padding: 30px; text-align: center;">
@@ -65,12 +62,21 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
       </div>
     `;
 
-    // Fire and forget email
-    sendEmail({
-      to: email,
-      subject: "🔑 Your UniVentry System Credentials",
-      htmlContent: emailHtml,
-    }).catch((err: any) => console.error("⚠️ Brevo Email Warning:", err));
+    // 🔥 FIX: Added 'await' and strict error logging so we know exactly why Brevo isn't sending it.
+    try {
+      console.log(`[BREVO] Attempting to send credentials to ${email}...`);
+      await sendEmail({
+        to: email,
+        subject: "🔑 Your UniVentry System Credentials",
+        htmlContent: emailHtml,
+      });
+      console.log(`[BREVO] Success! Email delivered to ${email}`);
+    } catch (mailErr: any) {
+      console.error(
+        "⚠️ Brevo Email Failed to Send! Reason:",
+        mailErr.response?.body || mailErr.message || mailErr,
+      );
+    }
 
     return res.status(201).json({
       success: true,
