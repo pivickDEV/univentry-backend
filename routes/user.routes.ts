@@ -96,23 +96,28 @@ router.put("/update-profile", async (req, res) => {
   try {
     const { userId, name, email } = req.body;
 
-    // 1. Prevent email duplication
-    const existingUser = await User.findOne({ email, _id: { $ne: userId } });
-    if (existingUser) {
-      return res
-        .status(400)
-        .json({ message: "Email is already taken by another user." });
-    }
-
+    // Use findByIdAndUpdate to ensure we are targeting the specific user
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { name, email },
       { new: true },
     ).select("-password");
 
-    res.status(200).json(updatedUser);
+    if (!updatedUser)
+      return res.status(404).json({ message: "User not found" });
+
+    res.status(200).json({
+      message: "Update successful",
+      user: {
+        id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        office: updatedUser.office, // Keep the office info
+      },
+    });
   } catch (err) {
-    res.status(500).json({ message: "Update failed" });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
