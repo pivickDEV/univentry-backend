@@ -92,4 +92,28 @@ router.delete("/:id", async (req: Request, res: Response) => {
   }
 });
 
+router.put("/update-profile", async (req, res) => {
+  try {
+    const { userId, name, email } = req.body;
+
+    // 1. Prevent email duplication
+    const existingUser = await User.findOne({ email, _id: { $ne: userId } });
+    if (existingUser) {
+      return res
+        .status(400)
+        .json({ message: "Email is already taken by another user." });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { name, email },
+      { new: true },
+    ).select("-password");
+
+    res.status(200).json(updatedUser);
+  } catch (err) {
+    res.status(500).json({ message: "Update failed" });
+  }
+});
+
 export default router;
