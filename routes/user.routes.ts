@@ -1,12 +1,13 @@
 /* eslint-disable */
-import bcrypt from "bcrypt";
 import express, { Request, Response } from "express";
 import {
   changePassword,
+  deleteUser,
   updateEmail,
   updateOffice,
   updateProfile,
 } from "../controllers/user.controller";
+import { authorize, protect } from "../middlewares/auth.middleware";
 import User from "../model/user"; // Make sure this matches your actual filename (e.g., user.model or user)
 
 const router = express.Router();
@@ -75,62 +76,7 @@ router.patch("/:id/role", async (req: Request, res: Response) => {
   }
 });
 
-// ==========================================================
-// 4. DELETE USER
-// ==========================================================
-/**
- * @route   DELETE /api/users/:id
- * @desc    Remove a staff account from the system
- * @access  Private (Admin Only)
- */
-router.delete("/:id", async (req: any, res: Response) => {
-  try {
-    const { password } = req.body;
-
-    // 🔥 1. Check password exists
-    if (!password) {
-      return res.status(400).json({ message: "Password is required" });
-    }
-
-    // 🔥 2. Get logged-in user from token
-    const currentUser = await User.findById(req.user._id);
-
-    if (!currentUser) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    // 🔥 3. Compare password
-    const isMatch = await bcrypt.compare(password, currentUser.password);
-
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid password" });
-    }
-
-    // 🔥 4. Prevent deleting super-admin (extra safety)
-    const targetUser = await User.findById(req.params.id);
-
-    if (!targetUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    if (
-      targetUser.role === "super-admin" &&
-      currentUser.role !== "super-admin"
-    ) {
-      return res.status(403).json({
-        message: "You cannot delete a Super-Admin account",
-      });
-    }
-
-    // 🔥 5. Delete only AFTER verification
-    await User.findByIdAndDelete(req.params.id);
-
-    res.status(200).json({ message: "Staff account deleted successfully" });
-  } catch (err) {
-    console.error("Delete User Error:", err);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
+router.delete("/:id", protect, authorize("admin", "super-admin"), deleteUser);
 
 router.put("/update-profile", async (req, res) => {
   try {
