@@ -11,15 +11,13 @@ const cctvLogSchema = new mongoose.Schema({
   cameraName: { type: String, required: true },
   confidence: { type: Number, required: true },
   screenshotBase64: { type: String, default: "" },
-
-  // 🔥 UPDATED ENUM: Added loitering and out of bounds
+  // 🔥 UPDATED: Only IN, OUT, and LOITERING allowed
   status: {
     type: String,
-    enum: ["IN", "OUT", "LOITERING", "OUT_OF_BOUNDS"],
+    enum: ["IN", "OUT", "LOITERING"],
     required: true,
     default: "IN",
   },
-
   date: { type: String, required: true },
   timestamp: { type: Date, default: Date.now },
 });
